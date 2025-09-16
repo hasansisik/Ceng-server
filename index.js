@@ -37,6 +37,9 @@ app.use(morgan('tiny'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Static files
+app.use(express.static('public'));
+
 //routes
 app.use('/v1/game', gameRouter);
 

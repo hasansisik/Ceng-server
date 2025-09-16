@@ -3,6 +3,7 @@ const Token = require("../models/Token");
 const { StatusCodes } = require("http-status-codes");
 const CustomError = require("../errors");
 const { generateToken } = require("../services/token.service");
+const { sendGameVerificationEmail, sendGameResetPasswordEmail } = require("../helpers");
 
 // Oyun Girişi
 const gameLogin = async (req, res, next) => {
@@ -29,6 +30,15 @@ const gameLogin = async (req, res, next) => {
       return res.status(401).json({
         error: "invalid_credentials",
         message: "Kullanıcı adı veya şifre yanlış"
+      });
+    }
+
+    // E-posta doğrulama kontrolü
+    if (!player.isVerified) {
+      return res.status(403).json({
+        message: "Lütfen e-postanızı doğrulayın!",
+        requiresVerification: true,
+        email: player.email,
       });
     }
 
@@ -85,10 +95,10 @@ const gameLogin = async (req, res, next) => {
 // Oyun Hesabı Oluştur
 const createGameAccount = async (req, res, next) => {
   try {
-    const { username, password } = req.body;
+    const { username, email, password } = req.body;
 
-    if (!username || !password) {
-      throw new CustomError.BadRequestError("Kullanıcı adı ve şifre gereklidir");
+    if (!username || !email || !password) {
+      throw new CustomError.BadRequestError("Kullanıcı adı, e-posta ve şifre gereklidir");
     }
 
     // Kullanıcı adı zaten var mı kontrol et
@@ -100,20 +110,43 @@ const createGameAccount = async (req, res, next) => {
       });
     }
 
+    // E-posta zaten var mı kontrol et
+    const existingEmail = await Game.findOne({ email });
+    if (existingEmail) {
+      return res.status(409).json({
+        error: "email_already_exists",
+        message: "Bu e-posta adresi zaten kayıtlı"
+      });
+    }
+
+    // Doğrulama kodu oluştur
+    const verificationCode = Math.floor(1000 + Math.random() * 9000);
+
     // Yeni oyuncu oluştur (şifre pre-save middleware ile hash'lenecek)
     const newPlayer = new Game({
       username,
+      email,
       password,
+      verificationCode,
       score: 0,
       highScore: 0,
       gamesPlayed: 0,
-      role: "player"
+      role: "player",
+      isVerified: false
     });
 
     await newPlayer.save();
 
+    // Doğrulama e-postası gönder
+    await sendGameVerificationEmail({
+      username: newPlayer.username,
+      email: newPlayer.email,
+      verificationCode: newPlayer.verificationCode,
+    });
+
     res.status(201).json({
-      message: "Hesap başarıyla oluşturuldu"
+      message: "Hesap başarıyla oluşturuldu. Lütfen e-posta adresinizi doğrulayın.",
+      email: newPlayer.email
     });
   } catch (error) {
     console.error("Hesap oluşturma hatası:", error);
@@ -235,6 +268,200 @@ const getPlayerStats = async (req, res, next) => {
   }
 };
 
+// E-posta Doğrulama
+const verifyEmail = async (req, res, next) => {
+  try {
+    const { email, verificationCode } = req.body;
+
+    if (!email || !verificationCode) {
+      throw new CustomError.BadRequestError("E-posta ve doğrulama kodu gereklidir");
+    }
+
+    const player = await Game.findOne({ email })
+      .select("+verificationCode");
+
+    if (!player) {
+      return res.status(404).json({
+        error: "user_not_found",
+        message: "Kullanıcı bulunamadı"
+      });
+    }
+
+    if (player.verificationCode !== Number(verificationCode)) {
+      return res.status(400).json({
+        error: "invalid_verification_code",
+        message: "Doğrulama kodu yanlış"
+      });
+    }
+
+    // Hesabı doğrula
+    player.isVerified = true;
+    player.verificationCode = undefined;
+    await player.save();
+
+    res.json({
+      message: "Hesap başarıyla doğrulandı"
+    });
+  } catch (error) {
+    console.error("E-posta doğrulama hatası:", error);
+    res.status(500).json({
+      error: "connection_error",
+      message: "Sunucuya ulaşılamıyor"
+    });
+  }
+};
+
+// Doğrulama E-postası Tekrar Gönder
+const resendVerificationEmail = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      throw new CustomError.BadRequestError("E-posta adresi gereklidir");
+    }
+
+    const player = await Game.findOne({ email });
+
+    if (!player) {
+      return res.status(404).json({
+        error: "user_not_found",
+        message: "Kullanıcı bulunamadı"
+      });
+    }
+
+    if (player.isVerified) {
+      return res.status(400).json({
+        error: "already_verified",
+        message: "Hesap zaten doğrulanmış"
+      });
+    }
+
+    // Yeni doğrulama kodu oluştur
+    const verificationCode = Math.floor(1000 + Math.random() * 9000);
+    player.verificationCode = verificationCode;
+    await player.save();
+
+    // Doğrulama e-postası gönder
+    await sendGameVerificationEmail({
+      username: player.username,
+      email: player.email,
+      verificationCode: player.verificationCode,
+    });
+
+    res.json({
+      message: "Doğrulama e-postası tekrar gönderildi"
+    });
+  } catch (error) {
+    console.error("Doğrulama e-postası gönderme hatası:", error);
+    res.status(500).json({
+      error: "connection_error",
+      message: "Sunucuya ulaşılamıyor"
+    });
+  }
+};
+
+// Şifre Sıfırlama E-postası Gönder
+const forgotPassword = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      throw new CustomError.BadRequestError("E-posta adresi gereklidir");
+    }
+
+    const player = await Game.findOne({ email });
+
+    if (!player) {
+      return res.status(404).json({
+        error: "user_not_found",
+        message: "Bu e-posta adresi ile kayıtlı kullanıcı bulunamadı"
+      });
+    }
+
+    // Şifre sıfırlama token'ı oluştur
+    const passwordToken = Math.floor(1000 + Math.random() * 9000);
+
+    // Token'ı kaydet (10 dakika geçerli)
+    const tenMinutes = 1000 * 60 * 10;
+    const passwordTokenExpirationDate = new Date(Date.now() + tenMinutes);
+
+    player.passwordToken = passwordToken;
+    player.passwordTokenExpirationDate = passwordTokenExpirationDate;
+    await player.save();
+
+    // Şifre sıfırlama e-postası gönder
+    await sendGameResetPasswordEmail({
+      username: player.username,
+      email: player.email,
+      passwordToken: player.passwordToken,
+    });
+
+    res.json({
+      message: "Şifre sıfırlama e-postası gönderildi"
+    });
+  } catch (error) {
+    console.error("Şifre sıfırlama e-postası hatası:", error);
+    res.status(500).json({
+      error: "connection_error",
+      message: "Sunucuya ulaşılamıyor"
+    });
+  }
+};
+
+// Şifre Sıfırla
+const resetPassword = async (req, res, next) => {
+  try {
+    const { email, passwordToken, newPassword } = req.body;
+
+    if (!email || !passwordToken || !newPassword) {
+      throw new CustomError.BadRequestError("E-posta, doğrulama kodu ve yeni şifre gereklidir");
+    }
+
+    const player = await Game.findOne({ email })
+      .select("+passwordToken +passwordTokenExpirationDate");
+
+    if (!player) {
+      return res.status(404).json({
+        error: "user_not_found",
+        message: "Kullanıcı bulunamadı"
+      });
+    }
+
+    const currentDate = new Date();
+
+    // Token kontrolü
+    if (player.passwordToken === String(passwordToken)) {
+      if (currentDate > player.passwordTokenExpirationDate) {
+        return res.status(400).json({
+          error: "token_expired",
+          message: "Doğrulama kodu süresi dolmuş"
+        });
+      }
+
+      // Şifreyi güncelle
+      player.password = newPassword;
+      player.passwordToken = undefined;
+      player.passwordTokenExpirationDate = undefined;
+      await player.save();
+
+      res.json({
+        message: "Şifre başarıyla sıfırlandı"
+      });
+    } else {
+      res.status(400).json({
+        error: "invalid_token",
+        message: "Geçersiz doğrulama kodu"
+      });
+    }
+  } catch (error) {
+    console.error("Şifre sıfırlama hatası:", error);
+    res.status(500).json({
+      error: "connection_error",
+      message: "Sunucuya ulaşılamıyor"
+    });
+  }
+};
+
 // Oyun Çıkışı
 const gameLogout = async (req, res, next) => {
   try {
@@ -264,5 +491,9 @@ module.exports = {
   getLeaderboard,
   postScore,
   getPlayerStats,
-  gameLogout
+  gameLogout,
+  verifyEmail,
+  resendVerificationEmail,
+  forgotPassword,
+  resetPassword
 };

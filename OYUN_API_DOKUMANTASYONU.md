@@ -52,6 +52,7 @@ Authorization: Bearer <access_token>
 ```json
 {
   "username": "yeniOyuncu",
+  "email": "oyuncu@example.com",
   "password": "yeniGizli!"
 }
 ```
@@ -59,7 +60,8 @@ Authorization: Bearer <access_token>
 **Başarılı Yanıt (201):**
 ```json
 {
-  "message": "Hesap başarıyla oluşturuldu"
+  "message": "Hesap başarıyla oluşturuldu. Lütfen e-posta adresinizi doğrulayın.",
+  "email": "oyuncu@example.com"
 }
 ```
 
@@ -68,6 +70,13 @@ Authorization: Bearer <access_token>
 {
   "error": "username_already_exists",
   "message": "Bu kullanıcı adı zaten alınmış"
+}
+```
+
+```json
+{
+  "error": "email_already_exists",
+  "message": "Bu e-posta adresi zaten kayıtlı"
 }
 ```
 
@@ -168,7 +177,94 @@ Authorization: Bearer <access_token>
 }
 ```
 
-### 6. Oyun Çıkışı - 🔒 Kimlik Doğrulama Gerekli
+### 6. E-posta Doğrulama
+**Endpoint:** `POST /verify-email`
+
+**İstek Gövdesi:**
+```json
+{
+  "email": "oyuncu@example.com",
+  "verificationCode": "1234"
+}
+```
+
+**Başarılı Yanıt (200):**
+```json
+{
+  "message": "Hesap başarıyla doğrulandı"
+}
+```
+
+**Hata Yanıtları:**
+```json
+{
+  "error": "invalid_verification_code",
+  "message": "Doğrulama kodu yanlış"
+}
+```
+
+### 7. Doğrulama E-postası Tekrar Gönder
+**Endpoint:** `POST /resend-verification`
+
+**İstek Gövdesi:**
+```json
+{
+  "email": "oyuncu@example.com"
+}
+```
+
+**Başarılı Yanıt (200):**
+```json
+{
+  "message": "Doğrulama e-postası tekrar gönderildi"
+}
+```
+
+### 8. Şifre Sıfırlama E-postası Gönder
+**Endpoint:** `POST /forgot-password`
+
+**İstek Gövdesi:**
+```json
+{
+  "email": "oyuncu@example.com"
+}
+```
+
+**Başarılı Yanıt (200):**
+```json
+{
+  "message": "Şifre sıfırlama e-postası gönderildi"
+}
+```
+
+### 9. Şifre Sıfırla
+**Endpoint:** `POST /reset-password`
+
+**İstek Gövdesi:**
+```json
+{
+  "email": "oyuncu@example.com",
+  "passwordToken": "1234",
+  "newPassword": "yeniGizli123"
+}
+```
+
+**Başarılı Yanıt (200):**
+```json
+{
+  "message": "Şifre başarıyla sıfırlandı"
+}
+```
+
+**Hata Yanıtları:**
+```json
+{
+  "error": "token_expired",
+  "message": "Doğrulama kodu süresi dolmuş"
+}
+```
+
+### 10. Oyun Çıkışı - 🔒 Kimlik Doğrulama Gerekli
 **Endpoint:** `GET /logout`
 
 **Header'lar:**
@@ -202,7 +298,12 @@ Authorization: Bearer <access_token>
 ```json
 {
   "username": "string (3-20 karakter, benzersiz)",
+  "email": "string (e-posta adresi, benzersiz, küçük harf)",
   "password": "string (min 6 karakter, hash'lenmiş, select: false)",
+  "verificationCode": "number (4 haneli doğrulama kodu, select: false)",
+  "passwordToken": "string (şifre sıfırlama token'ı, select: false)",
+  "passwordTokenExpirationDate": "date (token sona erme tarihi, select: false)",
+  "isVerified": "boolean (e-posta doğrulama durumu, varsayılan: false)",
   "score": "number (mevcut skor, varsayılan: 0)",
   "highScore": "number (en yüksek skor, varsayılan: 0)",
   "gamesPlayed": "number (toplam oyun, varsayılan: 0)",
@@ -245,6 +346,23 @@ Authorization: Bearer <access_token>
 4. **Korumalı Endpoint'ler**: `Authorization: Bearer <token>` header'ı kullanın
 5. **Çıkış**: Token'lar geçersiz kılınır ve veritabanından kaldırılır
 
+## Web Sayfaları
+
+Aşağıdaki HTML sayfaları `/public` klasöründe mevcuttur:
+
+- **`/verify-email.html`** - E-posta doğrulama sayfası
+- **`/forgot-password.html`** - Şifre sıfırlama talebi sayfası  
+- **`/reset-password.html`** - Yeni şifre belirleme sayfası
+
+Bu sayfalar otomatik olarak API ile entegre çalışır ve kullanıcı dostu arayüz sağlar.
+
+## E-posta Sistemi
+
+- **SMTP Yapılandırması**: `.env` dosyasında SMTP ayarları gerekli
+- **Doğrulama Kodu**: 4 haneli rastgele kod (10 dakika geçerli)
+- **Şifre Sıfırlama**: 4 haneli token ile güvenli sıfırlama
+- **HTML E-posta**: Güzel tasarlanmış HTML e-posta şablonları
+
 ## Entegrasyon Notları
 
 - Ana kimlik doğrulama API'si ile aynı JWT token sistemini kullanır
@@ -253,3 +371,5 @@ Authorization: Bearer <access_token>
 - Çapraz kaynak istekleri için CORS etkinleştirilmiştir
 - Hata yönetimi ana API ile aynı kalıbı takip eder
 - Mevcut `isAuthenticated` fonksiyonu ile middleware entegrasyonu
+- E-posta doğrulama zorunludur (giriş yapmadan önce)
+- Static dosyalar `/public` klasöründen serve edilir

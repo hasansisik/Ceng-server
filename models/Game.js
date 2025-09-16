@@ -5,27 +5,50 @@ const GameSchema = new mongoose.Schema(
   {
     username: {
       type: String,
-      required: [true, "Username is required"],
+      required: [true, "Kullanıcı adı gereklidir"],
       unique: true,
       trim: true,
-      minlength: [3, "Username must be at least 3 characters long"],
-      maxlength: [20, "Username cannot exceed 20 characters"]
+      minlength: [3, "Kullanıcı adı en az 3 karakter olmalıdır"],
+      maxlength: [20, "Kullanıcı adı 20 karakteri geçemez"]
+    },
+    email: {
+      type: String,
+      required: [true, "E-posta adresi gereklidir"],
+      unique: true,
+      lowercase: true,
+      trim: true
     },
     password: {
       type: String,
-      required: [true, "Password is required"],
-      minlength: [6, "Password must be at least 6 characters long"],
+      required: [true, "Şifre gereklidir"],
+      minlength: [6, "Şifre en az 6 karakter olmalıdır"],
       select: false
+    },
+    verificationCode: {
+      type: Number,
+      select: false
+    },
+    passwordToken: {
+      type: String,
+      select: false
+    },
+    passwordTokenExpirationDate: {
+      type: Date,
+      select: false
+    },
+    isVerified: {
+      type: Boolean,
+      default: false
     },
     score: {
       type: Number,
       default: 0,
-      min: [0, "Score cannot be negative"]
+      min: [0, "Skor negatif olamaz"]
     },
     highScore: {
       type: Number,
       default: 0,
-      min: [0, "High score cannot be negative"]
+      min: [0, "En yüksek skor negatif olamaz"]
     },
     gamesPlayed: {
       type: Number,
