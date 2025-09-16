@@ -137,12 +137,17 @@ const createGameAccount = async (req, res, next) => {
 
     await newPlayer.save();
 
-    // Doğrulama e-postası gönder
-    await sendGameVerificationEmail({
-      username: newPlayer.username,
-      email: newPlayer.email,
-      verificationCode: newPlayer.verificationCode,
-    });
+    // Doğrulama e-postası gönder (hata olsa bile hesap oluşturuldu)
+    try {
+      await sendGameVerificationEmail({
+        username: newPlayer.username,
+        email: newPlayer.email,
+        verificationCode: newPlayer.verificationCode,
+      });
+    } catch (emailError) {
+      console.error("E-posta gönderme hatası:", emailError);
+      // E-posta gönderilemese bile hesap oluşturuldu, kullanıcıya bilgi ver
+    }
 
     res.status(201).json({
       message: "Hesap başarıyla oluşturuldu. Lütfen e-posta adresinizi doğrulayın.",
@@ -187,6 +192,13 @@ const postScore = async (req, res, next) => {
   try {
     const { score } = req.body;
     const playerId = req.user.playerId;
+
+    if (!playerId) {
+      return res.status(401).json({
+        error: "invalid_token",
+        message: "Geçersiz token - playerId bulunamadı"
+      });
+    }
 
     if (score === undefined) {
       throw new CustomError.BadRequestError("Skor gereklidir");
@@ -239,13 +251,29 @@ const getPlayerStats = async (req, res, next) => {
   try {
     const playerId = req.user.playerId;
 
-    const player = await Game.findById(playerId)
-      .select("username score highScore gamesPlayed lastPlayed createdAt");
+    if (!playerId) {
+      return res.status(401).json({
+        error: "invalid_token",
+        message: "Geçersiz token - playerId bulunamadı"
+      });
+    }
 
-    if (!player || !player.isActive) {
+    
+    const player = await Game.findById(playerId)
+      .select("username score highScore gamesPlayed lastPlayed createdAt isActive");
+
+
+    if (!player) {
       return res.status(404).json({
         error: "user_not_found",
-        message: "Oyuncu bulunamadı"
+        message: "Oyuncu bulunamadı - ID eşleşmiyor"
+      });
+    }
+
+    if (!player.isActive) {
+      return res.status(404).json({
+        error: "user_not_found", 
+        message: "Oyuncu aktif değil"
       });
     }
 
@@ -342,11 +370,19 @@ const resendVerificationEmail = async (req, res, next) => {
     await player.save();
 
     // Doğrulama e-postası gönder
-    await sendGameVerificationEmail({
-      username: player.username,
-      email: player.email,
-      verificationCode: player.verificationCode,
-    });
+    try {
+      await sendGameVerificationEmail({
+        username: player.username,
+        email: player.email,
+        verificationCode: player.verificationCode,
+      });
+    } catch (emailError) {
+      console.error("E-posta gönderme hatası:", emailError);
+      return res.status(500).json({
+        error: "email_send_failed",
+        message: "E-posta gönderilemedi, lütfen tekrar deneyin"
+      });
+    }
 
     res.json({
       message: "Doğrulama e-postası tekrar gönderildi"
@@ -390,11 +426,19 @@ const forgotPassword = async (req, res, next) => {
     await player.save();
 
     // Şifre sıfırlama e-postası gönder
-    await sendGameResetPasswordEmail({
-      username: player.username,
-      email: player.email,
-      passwordToken: player.passwordToken,
-    });
+    try {
+      await sendGameResetPasswordEmail({
+        username: player.username,
+        email: player.email,
+        passwordToken: player.passwordToken,
+      });
+    } catch (emailError) {
+      console.error("E-posta gönderme hatası:", emailError);
+      return res.status(500).json({
+        error: "email_send_failed",
+        message: "E-posta gönderilemedi, lütfen tekrar deneyin"
+      });
+    }
 
     res.json({
       message: "Şifre sıfırlama e-postası gönderildi"
@@ -466,6 +510,13 @@ const resetPassword = async (req, res, next) => {
 const gameLogout = async (req, res, next) => {
   try {
     const playerId = req.user.playerId;
+
+    if (!playerId) {
+      return res.status(401).json({
+        error: "invalid_token",
+        message: "Geçersiz token - playerId bulunamadı"
+      });
+    }
 
     // Token'ı veritabanından sil
     await Token.findOneAndDelete({ user: playerId });
