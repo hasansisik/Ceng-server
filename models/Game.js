@@ -42,13 +42,11 @@ const GameSchema = new mongoose.Schema(
     },
     score: {
       type: Number,
-      default: 0,
-      min: [0, "Skor negatif olamaz"]
+      default: 0
     },
     highScore: {
       type: Number,
-      default: 0,
-      min: [0, "En yüksek skor negatif olamaz"]
+      default: 0
     },
     gamesPlayed: {
       type: Number,
