@@ -204,10 +204,11 @@ const postScore = async (req, res, next) => {
       throw new CustomError.BadRequestError("Skor gereklidir");
     }
 
-    if (typeof score !== 'number' || score < 0 || !Number.isInteger(score)) {
+    // Sadece tam sayı olmasını kontrol et, negatif olabilir!
+    if (typeof score !== 'number' || !Number.isInteger(score)) {
       return res.status(400).json({
         error: "invalid_score",
-        message: "Skor pozitif bir tam sayı olmalıdır"
+        message: "Skor bir tam sayı olmalıdır"
       });
     }
 
@@ -221,9 +222,9 @@ const postScore = async (req, res, next) => {
     }
 
     // Oyuncu verilerini güncelle
-    player.score = score;
-    if (score > player.highScore) {
-      player.highScore = score;
+    player.score += score; // gelen puanı mevcut puana ekle
+    if (player.score > player.highScore) {
+      player.highScore = player.score;
     }
     player.gamesPlayed += 1;
     player.lastPlayed = new Date();
