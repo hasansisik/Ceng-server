@@ -9,15 +9,33 @@ const { sendGameVerificationEmail, sendGameResetPasswordEmail } = require("../he
 const gameLogin = async (req, res, next) => {
   try {
     const { username, password } = req.body;
+    console.log("Login attempt:", username, password);
 
     if (!username || !password) {
       throw new CustomError.BadRequestError("Kullanıcı adı ve şifre gereklidir");
     }
 
-    const player = await Game.findOne({ username, isActive: true })
-      .select("+password");
+    // Hem email hem username ile giriş yapabilir
+    const player = await Game.findOne({
+      $or: [
+        { username: username },
+        { email: username }
+      ],
+      isActive: true
+    }).select("+password");
+
+    console.log("Player found:", !!player);
+    if (player) {
+      console.log("Player details:", {
+        username: player.username,
+        email: player.email,
+        isVerified: player.isVerified,
+        isActive: player.isActive
+      });
+    }
 
     if (!player) {
+      console.log("Player not found or inactive");
       return res.status(401).json({
         error: "invalid_credentials",
         message: "Kullanıcı adı veya şifre yanlış"
@@ -25,8 +43,10 @@ const gameLogin = async (req, res, next) => {
     }
 
     const isPasswordCorrect = await player.comparePassword(password);
+    console.log("Password correct:", isPasswordCorrect);
 
     if (!isPasswordCorrect) {
+      console.log("Password incorrect");
       return res.status(401).json({
         error: "invalid_credentials",
         message: "Kullanıcı adı veya şifre yanlış"
@@ -35,6 +55,7 @@ const gameLogin = async (req, res, next) => {
 
     // E-posta doğrulama kontrolü
     if (!player.isVerified) {
+      console.log("Email not verified");
       return res.status(403).json({
         message: "Lütfen e-postanızı doğrulayın!",
         requiresVerification: true,
@@ -76,6 +97,7 @@ const gameLogin = async (req, res, next) => {
     player.lastPlayed = new Date();
     await player.save();
 
+    console.log("Login successful for:", player.username);
     res.status(200).json({
       dataPlayer: {
         username: player.username,
@@ -457,6 +479,7 @@ const forgotPassword = async (req, res, next) => {
 const resetPassword = async (req, res, next) => {
   try {
     const { email, passwordToken, newPassword } = req.body;
+    console.log(email, passwordToken, newPassword);
 
     if (!email || !passwordToken || !newPassword) {
       throw new CustomError.BadRequestError("E-posta, doğrulama kodu ve yeni şifre gereklidir");
