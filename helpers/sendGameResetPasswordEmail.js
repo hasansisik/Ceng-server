@@ -1,40 +1,35 @@
 const sendEmail = require('./sendEmail');
 
 const sendGameResetPasswordEmail = async ({ username, email, passwordToken }) => {
-  const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${passwordToken}&email=${email}`;
-
   const message = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <h2 style="color: #333; text-align: center;">Şifre Sıfırlama</h2>
-      <p>Merhaba <strong>${username}</strong>,</p>
-      <p>Oyun hesabınız için şifre sıfırlama talebinde bulundunuz. Şifrenizi sıfırlamak için aşağıdaki butona tıklayın:</p>
-      
-      <div style="text-align: center; margin: 30px 0;">
-        <a href="${resetUrl}" style="background-color: #007bff; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
-          Şifremi Sıfırla
-        </a>
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff;">
+      <div style="background: linear-gradient(to right, #4CAF50, #45a049); padding: 20px; text-align: center;">
+        <h1 style="color: #ffffff; font-weight: bold; margin: 0; font-size: 28px;">CENG</h1>
       </div>
       
-      <p>Alternatif olarak, aşağıdaki doğrulama kodunu kullanabilirsiniz:</p>
-      
-      <div style="background-color: #f4f4f4; padding: 20px; text-align: center; margin: 20px 0;">
-        <h1 style="color: #007bff; font-size: 32px; margin: 0; letter-spacing: 5px;">${passwordToken}</h1>
+      <div style="padding: 30px 20px;">
+        <h2 style="color: #333; font-size: 24px; margin-bottom: 20px;">Merhaba, ${username}!</h2>
+        <p style="color: #333; font-size: 16px; line-height: 1.6; margin-bottom: 20px;">
+          Şifre sıfırlama talebiniz alındı. Şifrenizi sıfırlamak için aşağıdaki kodu kullanın:
+        </p>
+        
+        <div style="border: 2px dashed #4CAF50; padding: 25px; text-align: center; margin: 30px 0; background-color: #f9f9f9;">
+          <p style="color: #666; font-size: 12px; text-transform: uppercase; margin: 0 0 10px 0; letter-spacing: 1px;">SIFIRLAMA KODU</p>
+          <h1 style="color: #4CAF50; font-size: 36px; font-weight: bold; margin: 0; letter-spacing: 8px;">${passwordToken}</h1>
+        </div>
+        
+        <div style="border-left: 4px solid #ff9800; background-color: #fff3cd; padding: 15px; margin: 20px 0;">
+          <p style="color: #333; font-size: 14px; margin: 0; line-height: 1.6;">
+            <strong>Önemli:</strong> Bu kod 10 dakika içinde geçersiz olacaktır. Eğer şifre sıfırlama talebinde bulunmadıysanız, bu e-postayı görmezden gelebilirsiniz ve şifreniz değişmeyecektir.
+          </p>
+        </div>
       </div>
-      
-      <p><strong>Önemli:</strong> Bu bağlantı 10 dakika geçerlidir. Güvenliğiniz için bu süre sonunda geçersiz hale gelecektir.</p>
-      
-      <p>Eğer bu talebi siz yapmadıysanız, bu e-postayı görmezden gelebilirsiniz.</p>
-      
-      <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
-      <p style="color: #666; font-size: 12px; text-align: center;">
-        Bu e-posta otomatik olarak gönderilmiştir. Lütfen yanıtlamayın.
-      </p>
     </div>
   `;
 
   return sendEmail({
     to: email,
-    subject: 'Oyun Hesabı Şifre Sıfırlama',
+    subject: 'CENG - Şifre Sıfırlama',
     html: message,
   });
 };
