@@ -53,16 +53,6 @@ const gameLogin = async (req, res, next) => {
       });
     }
 
-    // E-posta doğrulama kontrolü
-    if (!player.isVerified) {
-      console.log("Email not verified");
-      return res.status(403).json({
-        message: "Lütfen e-postanızı doğrulayın!",
-        requiresVerification: true,
-        email: player.email,
-      });
-    }
-
     // Token oluştur
     const accessToken = await generateToken(
       { playerId: player._id, username: player.username, role: player.role },
@@ -506,10 +496,17 @@ const resetPassword = async (req, res, next) => {
         });
       }
 
+      // Mevcut isVerified değerini koru
+      const currentIsVerified = player.isVerified;
+
       // Şifreyi güncelle
       player.password = newPassword;
       player.passwordToken = undefined;
       player.passwordTokenExpirationDate = undefined;
+      
+      // isVerified değerini koru (değiştirme)
+      player.isVerified = currentIsVerified;
+      
       await player.save();
 
       res.json({
