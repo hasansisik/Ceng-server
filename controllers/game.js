@@ -557,6 +557,49 @@ const gameLogout = async (req, res, next) => {
   }
 };
 
+// Oyun Hesabı Sil - Kullanıcı ve Tüm İlişkili Verileri Sil
+const deleteGame = async (req, res, next) => {
+  try {
+    const playerId = req.user.playerId;
+
+    if (!playerId) {
+      return res.status(401).json({
+        error: "invalid_token",
+        message: "Geçersiz token - playerId bulunamadı"
+      });
+    }
+
+    // Oyuncuyu bul
+    const player = await Game.findById(playerId);
+
+    if (!player) {
+      return res.status(404).json({
+        error: "user_not_found",
+        message: "Oyuncu bulunamadı"
+      });
+    }
+
+    // Tüm token'ları sil (kullanıcıya ait tüm oturumlar)
+    await Token.deleteMany({ user: playerId });
+
+    // Oyuncuyu ve tüm verilerini sil (score, highScore, gamesPlayed, loader, vb.)
+    await Game.findByIdAndDelete(playerId);
+
+    // Refresh token cookie'sini temizle
+    res.clearCookie("refreshToken", { path: "/v1/game/refreshtoken" });
+
+    res.status(200).json({
+      message: "Hesap ve tüm veriler başarıyla silindi"
+    });
+  } catch (error) {
+    console.error("Oyun hesabı silme hatası:", error);
+    res.status(500).json({
+      error: "connection_error",
+      message: "Sunucuya ulaşılamıyor"
+    });
+  }
+};
+
 module.exports = {
   gameLogin,
   createGameAccount,
@@ -567,5 +610,6 @@ module.exports = {
   verifyEmail,
   resendVerificationEmail,
   forgotPassword,
-  resetPassword
+  resetPassword,
+  deleteGame
 };

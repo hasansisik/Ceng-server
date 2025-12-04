@@ -9,7 +9,8 @@ const {
   verifyEmail,
   resendVerificationEmail,
   forgotPassword,
-  resetPassword
+  resetPassword,
+  deleteGame
 } = require('../controllers/game');
 const { isAuthenticated } = require('../middleware/authMiddleware');
 
@@ -22,6 +23,7 @@ router.get('/leaderboard', getLeaderboard);
 router.post('/score', isAuthenticated, postScore);
 router.get('/player/stats', isAuthenticated, getPlayerStats);
 router.get('/logout', isAuthenticated, gameLogout);
+router.delete('/account', isAuthenticated, deleteGame);
 
 // E-posta doğrulama ve şifre sıfırlama
 router.post('/verify-email', verifyEmail);
